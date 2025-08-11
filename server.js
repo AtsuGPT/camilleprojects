@@ -39,7 +39,7 @@ app.get('/', async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <title>Publicações</title>
-        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="C:\Users\satan\OneDrive\Desktop\postsite\style.css">
       </head>
       <body>
         <div class="container">
