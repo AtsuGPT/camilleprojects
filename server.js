@@ -1,13 +1,11 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { Pool } = require('pg');
-const path = require('path');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Conexão com Postgres
+// Conexão com Postgres (use a variável de ambiente DATABASE_URL)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -39,7 +37,55 @@ app.get('/', async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <title>Publicações</title>
-        <link rel="stylesheet" href="C:\Users\satan\OneDrive\Desktop\postsite\style.css">
+        <style>
+          body {
+            background-color: #121212;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+          }
+          .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+          }
+          h1 {
+            text-align: center;
+          }
+          .post {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+          }
+          button {
+            background-color: #007bff;
+            border: none;
+            padding: 8px 12px;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+          }
+          button:hover {
+            background-color: #0056b3;
+          }
+          .add-form {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+          }
+          .add-form textarea {
+            resize: none;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border: none;
+            font-size: 16px;
+            font-family: Arial, sans-serif;
+            min-height: 80px;
+          }
+        </style>
       </head>
       <body>
         <div class="container">
@@ -74,6 +120,5 @@ app.post('/like/:id', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Porta
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
