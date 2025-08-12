@@ -2,7 +2,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const { Pool } = require("pg");
-const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -15,7 +14,7 @@ const pool = new Pool({
 
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Criar tabela/colunas se não existirem
+// Criar tabelas e colunas necessárias
 (async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS posts (
@@ -26,15 +25,13 @@ app.use(bodyParser.urlencoded({ extended: true }));
     );
   `);
 
-  const colCheck = await pool.query(`
-    SELECT column_name FROM information_schema.columns
-    WHERE table_name='posts' AND column_name='title';
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS likes_log (
+      id SERIAL PRIMARY KEY,
+      post_id INT,
+      ip VARCHAR(255)
+    );
   `);
-
-  if (colCheck.rows.length === 0) {
-    await pool.query(`ALTER TABLE posts ADD COLUMN title TEXT NOT NULL DEFAULT '';`);
-    console.log("✅ Coluna 'title' adicionada");
-  }
 })();
 
 // Página principal
@@ -49,6 +46,7 @@ app.get("/", async (req, res) => {
 <head>
   <meta charset="utf-8">
   <title>${latestTitle}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
       background-color: #121212;
@@ -61,7 +59,7 @@ app.get("/", async (req, res) => {
       align-items: center;
     }
     .container {
-      width: 90%;
+      width: 95%;
       max-width: 800px;
       padding: 20px;
     }
@@ -75,6 +73,7 @@ app.get("/", async (req, res) => {
       margin-bottom: 15px;
       border-radius: 8px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+      word-wrap: break-word;
     }
     .post-title {
       font-size: 1.5em;
@@ -134,39 +133,56 @@ app.get("/", async (req, res) => {
   `);
 });
 
-// Página de admin
-app.get("/admin", (req, res) => {
+// Página do admin
+app.get("/admin", async (req, res) => {
+  const posts = (await pool.query("SELECT * FROM posts ORDER BY id DESC")).rows;
   res.send(`
-    <form method="POST" action="/admin">
-      <input type="password" name="password" placeholder="Senha" required><br>
-      <input type="text" name="title" placeholder="Título" required><br>
-      <textarea name="content" placeholder="Conteúdo" required></textarea><br>
-      <button type="submit">Publicar</button>
-    </form>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <h1>Área do Admin</h1>
+  <form method="POST" action="/admin">
+    <input type="password" name="password" placeholder="Senha" required><br>
+    <input type="text" name="title" placeholder="Título" required><br>
+    <textarea name="content" placeholder="Conteúdo" required></textarea><br>
+    <button type="submit">Publicar</button>
+  </form>
+  <hr>
+  <h2>Posts existentes</h2>
+  ${posts.map(p => `
+    <div style="border:1px solid #ccc; padding:10px; margin-bottom:5px;">
+      <strong>${p.title}</strong><br>
+      ${p.content}<br>
+      Likes: ${p.likes}<br>
+      <form method="POST" action="/delete/${p.id}" style="display:inline;">
+        <input type="hidden" name="password" value="${ADMIN_PASSWORD}">
+        <button type="submit" style="background:red;color:white;">Deletar</button>
+      </form>
+    </div>
+  `).join("")}
   `);
 });
 
+// Criar post
 app.post("/admin", async (req, res) => {
   if (req.body.password !== ADMIN_PASSWORD) {
     return res.send("Senha incorreta.");
   }
   await pool.query("INSERT INTO posts (title, content) VALUES ($1, $2)", [req.body.title, req.body.content]);
-  res.redirect("/");
+  res.redirect("/admin");
+});
+
+// Deletar post
+app.post("/delete/:id", async (req, res) => {
+  if (req.body.password !== ADMIN_PASSWORD) {
+    return res.send("Senha incorreta.");
+  }
+  await pool.query("DELETE FROM posts WHERE id=$1", [req.params.id]);
+  res.redirect("/admin");
 });
 
 // Curtir post
 app.post("/like/:id", async (req, res) => {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const postId = req.params.id;
-
-  // Checar se já curtiu por IP
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS likes_log (
-      id SERIAL PRIMARY KEY,
-      post_id INT,
-      ip VARCHAR(255)
-    );
-  `);
 
   const check = await pool.query("SELECT * FROM likes_log WHERE post_id=$1 AND ip=$2", [postId, ip]);
   if (check.rows.length > 0) {
